@@ -14,9 +14,13 @@ class Homepage extends StatefulWidget {
 class _HomepageState extends State<Homepage> {
   //ใช้ดึง data จากไฟล์ jsonในเครื่อง
   List data = [];
-  _initData() {
-    DefaultAssetBundle.of(context).loadString('json/info.json').then((value) {
-      data = json.decode(value);
+  _initData() async {
+    await DefaultAssetBundle.of(context)
+        .loadString('json/info.json')
+        .then((value) {
+      setState(() {
+        data = json.decode(value);
+      });
     });
   }
 
