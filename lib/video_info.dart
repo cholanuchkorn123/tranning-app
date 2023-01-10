@@ -16,6 +16,7 @@ class Video extends StatefulWidget {
 class _VideoState extends State<Video> {
   List data = [];
   bool _playarea = false;
+  bool _isplaying = false;
   late VideoPlayerController _controller;
   _initData() async {
     await DefaultAssetBundle.of(context)
@@ -164,7 +165,7 @@ class _VideoState extends State<Video> {
                           ]),
                     )
                   : Container(
-                      height: 100,
+                      height: 320,
                       padding:
                           const EdgeInsets.only(top: 40, left: 30, right: 30),
                       child: Column(children: [
@@ -184,7 +185,13 @@ class _VideoState extends State<Video> {
                             ),
                           ],
                         ),
-                        _playvideocard(context)
+                        SizedBox(
+                          height: 20,
+                        ),
+                        _playvideocard(context),
+                        Container(
+                          child: _crotrollview(context),
+                        )
                       ]),
                     ),
               Expanded(
@@ -236,7 +243,9 @@ class _VideoState extends State<Video> {
                       SizedBox(
                         height: 15,
                       ),
-                      Expanded(child: _listviewcard())
+                      Expanded(
+                        child: _listviewcard(),
+                      ),
                     ],
                   ),
                 ),
@@ -252,14 +261,53 @@ class _VideoState extends State<Video> {
   Widget _playvideocard(BuildContext context) {
     final controller = _controller;
     if (controller != null && controller.value.isInitialized) {
-      return Container(
-        height: 300,
-        width: 300,
+      return AspectRatio(
+        aspectRatio: 16 / 9,
         child: VideoPlayer(controller),
       );
     } else {
-      return Text('not show anything');
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Center(
+          child: Text(
+            'Wait for Video',
+            style: TextStyle(color: Colors.white, fontSize: 20),
+          ),
+        ),
+      );
     }
+  }
+
+  Widget _crotrollview(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        TextButton(
+          onPressed: () async {},
+          child: Icon(
+            Icons.fast_rewind,
+            size: 30,
+            color: Colors.white,
+          ),
+        ),
+        TextButton(
+            onPressed: () async {
+              _isplaying == false ? _controller.pause() : _controller.play();
+            },
+            child: (Icon(
+              _isplaying ? Icons.play_arrow : Icons.pause,
+              size: 30,
+              color: Colors.white,
+            ))),
+        TextButton(
+            onPressed: () {},
+            child: Icon(
+              Icons.fast_rewind,
+              size: 30,
+              color: Colors.white,
+            ))
+      ],
+    );
   }
 
   _listviewcard() {
@@ -271,12 +319,24 @@ class _VideoState extends State<Video> {
     );
   }
 
+  void _oncontrollUpdate() async {
+    final controller = _controller;
+    if (!controller.value.isInitialized) {
+      return;
+    }
+    final playing = controller.value.isPlaying;
+    _isplaying = playing;
+  }
+
   _ontapvideo(int index) {
-    final controller = VideoPlayerController.network(data[index]['videoUrl']);
+    final controller = VideoPlayerController.asset(data[index]['videoUrl']);
     _controller = controller;
     setState(() {});
     _controller
       ..initialize().then((_) {
+        controller.addListener(() {
+          _oncontrollUpdate;
+        });
         controller.play();
         setState(() {});
       });
@@ -289,7 +349,9 @@ class _VideoState extends State<Video> {
             onTap: () {
               _ontapvideo(index);
               setState(() {
-                _playarea == false ? _playarea = true : _playarea = false;
+                if (_playarea == false) {
+                  _playarea = true;
+                }
               });
             },
             child: Container(
