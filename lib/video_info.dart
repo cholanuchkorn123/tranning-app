@@ -17,7 +17,9 @@ class _VideoState extends State<Video> {
   List data = [];
   bool _playarea = false;
   bool _isplaying = false;
-  late VideoPlayerController _controller;
+  bool _disponed = false;
+  int _videoindex = -1;
+  VideoPlayerController? _controller;
   _initData() async {
     await DefaultAssetBundle.of(context)
         .loadString('json/video.json')
@@ -33,6 +35,16 @@ class _VideoState extends State<Video> {
     // TODO: implement initState
     super.initState();
     _initData();
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    //เคลีย memomry เวลาย้ายหน้า
+    _disponed = true;
+    _controller?.pause();
+    _controller?.dispose();
   }
 
   @override
@@ -165,14 +177,16 @@ class _VideoState extends State<Video> {
                           ]),
                     )
                   : Container(
-                      height: 320,
+                      height: 330,
                       padding:
                           const EdgeInsets.only(top: 40, left: 30, right: 30),
                       child: Column(children: [
                         Row(
                           children: [
                             InkWell(
-                              onTap: () {},
+                              onTap: () {
+                                Get.to(() => Homepage());
+                              },
                               child: Icon(
                                 Icons.arrow_back_ios,
                                 size: 20,
@@ -189,7 +203,13 @@ class _VideoState extends State<Video> {
                           height: 20,
                         ),
                         _playvideocard(context),
+                        SizedBox(
+                          height: 5,
+                        ),
                         Container(
+                          padding: const EdgeInsets.only(
+                            right: 20,
+                          ),
                           child: _crotrollview(context),
                         )
                       ]),
@@ -279,11 +299,58 @@ class _VideoState extends State<Video> {
   }
 
   Widget _crotrollview(BuildContext context) {
+    //เช๊คว่ามันมีเสียงไหม
+    final noMute = (_controller?.value.volume ?? 0) > 0;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        InkWell(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                noMute ? Icons.volume_up : Icons.volume_off,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          onTap: () {
+            if (noMute) {
+              _controller?.setVolume(0);
+            } else {
+              _controller?.setVolume(1);
+            }
+            setState(() {});
+          },
+        ),
         TextButton(
-          onPressed: () async {},
+          onPressed: () async {
+            final index = _videoindex - 1;
+            if (index >= 0 && data.length >= 0) {
+              _ontapvideo(index);
+            } else {
+              //แสดง tapลงมาบอก
+              Get.snackbar(
+                'Video',
+                '',
+                snackPosition: SnackPosition.BOTTOM,
+                icon: Icon(
+                  Icons.dangerous,
+                  size: 25,
+                  color: Colors.white,
+                ),
+                backgroundColor: Colors.grey,
+                messageText: Text(
+                  'No video on previous',
+                  style: TextStyle(color: Colors.white),
+                ),
+              );
+            }
+          },
           child: Icon(
             Icons.fast_rewind,
             size: 30,
@@ -292,17 +359,49 @@ class _VideoState extends State<Video> {
         ),
         TextButton(
             onPressed: () async {
-              _isplaying == false ? _controller.pause() : _controller.play();
+              if (_isplaying) {
+                setState(() {
+                  _isplaying = false;
+                });
+                _controller!.pause();
+              } else {
+                setState(() {
+                  _isplaying = true;
+                });
+                _controller!.play();
+              }
             },
             child: (Icon(
-              _isplaying ? Icons.play_arrow : Icons.pause,
+              _isplaying ? Icons.pause : Icons.play_arrow,
               size: 30,
               color: Colors.white,
             ))),
         TextButton(
-            onPressed: () {},
+            onPressed: () {
+              final index = _videoindex + 1;
+              if (index <= data.length - 1) {
+                _ontapvideo(index);
+              } else {
+                //แสดง tapลงมาบอก
+                Get.snackbar(
+                  'Video',
+                  '',
+                  snackPosition: SnackPosition.BOTTOM,
+                  icon: Icon(
+                    Icons.celebration_sharp,
+                    size: 25,
+                    color: Colors.white,
+                  ),
+                  backgroundColor: Colors.grey,
+                  messageText: Text(
+                    'You have finished All workout',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                );
+              }
+            },
             child: Icon(
-              Icons.fast_rewind,
+              Icons.fast_forward,
               size: 30,
               color: Colors.white,
             ))
@@ -319,27 +418,46 @@ class _VideoState extends State<Video> {
     );
   }
 
+  var _onUpdateController = 0;
   void _oncontrollUpdate() async {
-    final controller = _controller;
-    if (!controller.value.isInitialized) {
+    if (_disponed) {
       return;
     }
-    final playing = controller.value.isPlaying;
+    _onUpdateController = 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (_onUpdateController > now) {
+      return;
+    }
+    _onUpdateController = now + 500;
+    final controller = _controller;
+    if (!controller!.value.isInitialized) {
+      return;
+    }
+    final playing = controller!.value.isPlaying;
     _isplaying = playing;
   }
 
   _ontapvideo(int index) {
     final controller = VideoPlayerController.asset(data[index]['videoUrl']);
+    final old = _controller;
+    if (old != null) {
+      old.removeListener(_oncontrollUpdate);
+      old.pause();
+    }
+
     _controller = controller;
     setState(() {});
-    _controller
-      ..initialize().then((_) {
-        controller.addListener(() {
-          _oncontrollUpdate;
-        });
-        controller.play();
-        setState(() {});
+    _controller?.initialize().then((_) {
+      controller.addListener(() {
+        _oncontrollUpdate;
       });
+      old?.dispose();
+      _videoindex = index;
+      controller.play();
+      setState(() {
+        _isplaying = true;
+      });
+    });
   }
 
   _columncard(int index) {
